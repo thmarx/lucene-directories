@@ -53,6 +53,12 @@
 			<artifactId>h2-mvstore</artifactId>
 			<version>${mvstore.version}</version>
 		</dependency>
+		
+		<dependency>
+			<groupId>org.mapdb</groupId>
+			<artifactId>mapdb</artifactId>
+			<version>3.0.8</version>
+		</dependency>
 
 
 		<dependency>

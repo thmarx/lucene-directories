@@ -17,3 +17,4 @@ target/
 db-data/
 mvstore-data/
 rocksdb-new-data/
+mapdb-data/
