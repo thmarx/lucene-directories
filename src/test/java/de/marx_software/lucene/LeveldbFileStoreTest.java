@@ -1,7 +1,7 @@
 package de.marx_software.lucene;
 
 
-import de.marx_software.lucene.mapdb.MapDBFileStore;
+import de.marx_software.lucene.leveldb.LeveldbFileStore;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -17,7 +17,7 @@ import java.util.Set;
 public class LeveldbFileStoreTest {
 
     private byte[] bb = "abcefghijklmnopqrstuvwxyz1234567890".getBytes();
-    private MapDBFileStore store;
+    private LeveldbFileStore store;
 
     private File tmpFile;
 
@@ -27,7 +27,7 @@ public class LeveldbFileStoreTest {
         if (tmpFile.exists()) {
             TestUtils.deleteDir(tmpFile);
         }
-        store = new MapDBFileStore(tmpFile.toPath());
+        store = new LeveldbFileStore(tmpFile.toPath());
     }
 
     @After

@@ -6,7 +6,6 @@
 package de.marx_software.lucene;
 
 import de.marx_software.lucene.leveldb.LeveldbFileStore;
-import de.marx_software.lucene.mapdb.MapDBFileStore;
 import de.marx_software.lucene.mvstore.MVStoreFileStore;
 import de.marx_software.lucene.rocksdb.RocksDBFileStore;
 import java.io.IOException;
@@ -29,10 +28,6 @@ public class DBDirectories {
 	}
 	public static DBDirectory mvstore (final Path path) throws IOException {
 		DBFileStore fileStore = new MVStoreFileStore(path);
-		return new DBDirectory(fileStore);
-	}
-	public static DBDirectory mapdb (final Path path) throws IOException {
-		DBFileStore fileStore = new MapDBFileStore(path);
 		return new DBDirectory(fileStore);
 	}
 }
