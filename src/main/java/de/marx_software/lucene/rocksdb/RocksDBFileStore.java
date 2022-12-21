@@ -22,24 +22,29 @@ public class RocksDBFileStore extends BaseDBFileStore {
 
 	private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
-	private final RocksDB metaDb;
-	private final RocksDB dataDb;
+	private final RocksDB storeDb;
+	private ColumnFamilyHandle dataHandle;
+	private ColumnFamilyHandle metaHandle;
 
+	
 	public RocksDBFileStore(Path path) throws IOException {
 		Options options = new Options();
 		options.setCreateIfMissing(true);
 		options.setCompressionType(CompressionType.SNAPPY_COMPRESSION);
-		File meta = new File(path.toFile(), "_meta");
 		File data = new File(path.toFile(), "_data");
-		if (!meta.exists()) {
-			meta.mkdirs();
-		}
+		
 		if (!data.exists()) {
 			data.mkdirs();
 		}
 		try {
-			metaDb = RocksDB.open(options, meta.getAbsolutePath());
-			dataDb = RocksDB.open(options, data.getAbsolutePath());
+			storeDb = RocksDB.open(options, data.getAbsolutePath());
+			
+			ColumnFamilyDescriptor metaCol = new ColumnFamilyDescriptor("meta".getBytes());
+			ColumnFamilyDescriptor dataCol = new ColumnFamilyDescriptor("data".getBytes());
+			
+			dataHandle = storeDb.createColumnFamily(dataCol);
+			metaHandle = storeDb.createColumnFamily(metaCol);
+			
 		} catch (RocksDBException ex) {
 			throw new IOException(ex);
 		}
@@ -50,7 +55,7 @@ public class RocksDBFileStore extends BaseDBFileStore {
 		lock.readLock().lock();
 		try {
 			byte[] key0 = key.getBytes();
-			byte[] bytes = metaDb.get(key0);
+			byte[] bytes = storeDb.get(metaHandle, key0);
 			return bytes != null;
 		} catch (RocksDBException ex) {
 			java.util.logging.Logger.getLogger(RocksDBFileStore.class.getName()).log(Level.SEVERE, null, ex);
@@ -85,7 +90,7 @@ public class RocksDBFileStore extends BaseDBFileStore {
 				int r = Math.min(BLOCK_SIZE - m, n);
 				int i = (int) (p / (long) BLOCK_SIZE);
 
-				byte[] bb = dataDb.get((name + "_" + i).getBytes());
+				byte[] bb = storeDb.get(dataHandle, (name + "_" + i).getBytes());
 
 				System.arraycopy(bb, m, buf, f, r);
 
@@ -118,7 +123,7 @@ public class RocksDBFileStore extends BaseDBFileStore {
 		lock.readLock().lock();
 		try {
 			byte[] key0 = key.getBytes();
-			byte[] bytes = metaDb.get(key0);
+			byte[] bytes = storeDb.get(metaHandle, key0);
 			if (bytes != null) {
 				return readLong(bytes);
 			}
@@ -146,9 +151,9 @@ public class RocksDBFileStore extends BaseDBFileStore {
 			}
 			int n = (int) ((size + BLOCK_SIZE - 1) / BLOCK_SIZE);
 			for (int i = 0; i < n; i++) {
-				dataDb.delete((key + "_" + i).getBytes());
+				storeDb.delete(dataHandle, (key + "_" + i).getBytes());
 			}
-			metaDb.delete(key0);
+			storeDb.delete(metaHandle, key0);
 
 		} catch (RocksDBException ex) {
 			java.util.logging.Logger.getLogger(RocksDBFileStore.class.getName()).log(Level.SEVERE, null, ex);
@@ -177,7 +182,7 @@ public class RocksDBFileStore extends BaseDBFileStore {
 		Set<String> keys = new HashSet<>();
 		lock.readLock().lock();
 		try {
-			try ( RocksIterator iterator = metaDb.newIterator();) {
+			try ( RocksIterator iterator = storeDb.newIterator(metaHandle);) {
 				iterator.seekToFirst();
 				while (iterator.isValid()) {
 					keys.add(new String(iterator.key()).intern());
@@ -216,11 +221,11 @@ public class RocksDBFileStore extends BaseDBFileStore {
 				if (m == 0) {
 					bb = new byte[BLOCK_SIZE];
 				} else {
-					bb = dataDb.get((name + "_" + i).getBytes());
+					bb = storeDb.get(dataHandle, (name + "_" + i).getBytes());
 				}
 
 				System.arraycopy(buf, f, bb, m, r);
-				dataDb.put((name + "_" + i).getBytes(), bb);
+				storeDb.put(dataHandle, (name + "_" + i).getBytes(), bb);
 				size += r;
 				f += r;
 				n -= r;
@@ -230,7 +235,7 @@ public class RocksDBFileStore extends BaseDBFileStore {
 				}
 			}
 
-			metaDb.put(name.getBytes(), longToBytes(size));
+			storeDb.put(metaHandle, name.getBytes(), longToBytes(size));
 
 		} catch (RocksDBException ex) {
 			java.util.logging.Logger.getLogger(RocksDBFileStore.class.getName()).log(Level.SEVERE, null, ex);
@@ -248,12 +253,12 @@ public class RocksDBFileStore extends BaseDBFileStore {
 		try {
 
 			long s_size = getSize(source);
-			metaDb.put(dest.getBytes(), longToBytes(s_size));
+			storeDb.put(metaHandle, dest.getBytes(), longToBytes(s_size));
 
 			int n = (int) ((s_size + BLOCK_SIZE - 1) / BLOCK_SIZE);
 
 			for (int i = 0; i < n; i++) {
-				dataDb.put((dest + "_" + i).getBytes(), dataDb.get((source + "_" + i).getBytes()));
+				storeDb.put(dataHandle, (dest + "_" + i).getBytes(), storeDb.get(dataHandle, (source + "_" + i).getBytes()));
 			}
 			remove(source);
 
@@ -269,17 +274,15 @@ public class RocksDBFileStore extends BaseDBFileStore {
 	@Override
 	public void close() throws IOException {
 		try {
-			metaDb.close();
+			storeDb.close();
 		} finally {
-			dataDb.close();
 		}
 	}
 
 	@Override
 	public void sync() throws IOException {
 		try {
-			metaDb.compactRange();
-			dataDb.compactRange();
+			storeDb.compactRange();
 		} catch (RocksDBException ex) {
 			java.util.logging.Logger.getLogger(RocksDBFileStore.class.getName()).log(Level.SEVERE, null, ex);
 			

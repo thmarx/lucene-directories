@@ -22,7 +22,7 @@ import java.nio.file.Paths;
 import org.rocksdb.RocksDBException;
 
 /**
- * Created by wens on 16-3-11.
+ * Created by thmarx.
  */
 public class RocksDBDirectoryTest {
 

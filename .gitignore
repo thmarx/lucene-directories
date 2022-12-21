@@ -19,4 +19,5 @@ mvstore-data/
 rocksdb-new-data/
 mapdb-data/
 rocksdb-data/
+fs-data/
 .vscode/
